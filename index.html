@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen: AI Product Designer Assistant</title>
+<meta name="description" content="Lumen turns any screenshot, wireframe or mockup into instant AI powered UX audits, accessibility checks, design critiques and improvement recommendations.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23cdf564'/%3E%3Ccircle cx='16' cy='15' r='6' fill='none' stroke='%230c0d10' stroke-width='2.5'/%3E%3Ccircle cx='21' cy='21' r='2.5' fill='%230c0d10'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,400&family=Hanken+Grotesk:wght@300..800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0d10;
+    --bg-2:#121317;
+    --ink:#0c0d10;
+    --paper:#f5f2ea;
+    --paper-2:#ece7db;
+    --accent:#cdf564;
+    --accent-deep:#9fc92e;
+    --coral:#ff6a45;
+    --txt:#eceadf;
+    --txt-dim:#9a988e;
+    --line:rgba(245,242,234,.10);
+    --line-strong:rgba(245,242,234,.18);
+    --good:#7ddb8f;
+    --warn:#f2c14e;
+    --bad:#ff6a45;
+    --radius:18px;
+    --serif:"Fraunces",Georgia,serif;
+    --sans:"Hanken Grotesk",-apple-system,sans-serif;
+    --mono:"Space Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--txt);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+    line-height:1.5;
+  }
+  /* grain + mesh */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(900px 500px at 78% -8%, rgba(205,245,100,.13), transparent 60%),
+      radial-gradient(800px 600px at 8% 18%, rgba(255,106,69,.08), transparent 55%),
+      radial-gradient(700px 700px at 95% 90%, rgba(120,140,255,.06), transparent 60%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.4;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+  .wrap{position:relative;z-index:2}
+  ::selection{background:var(--accent);color:var(--ink)}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+  /* ---------- shared ---------- */
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    border:1px solid var(--line-strong);border-radius:999px;padding:6px 13px;color:var(--txt-dim);font-weight:600}
+  .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+  .btn{display:inline-flex;align-items:center;gap:9px;border-radius:999px;padding:13px 24px;font-weight:600;font-size:15px;transition:.25s;white-space:nowrap}
+  .btn-primary{background:var(--accent);color:var(--ink)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(205,245,100,.3)}
+  .btn-ghost{border:1px solid var(--line-strong);color:var(--txt)}
+  .btn-ghost:hover{background:rgba(245,242,234,.06);border-color:var(--txt-dim)}
+  .mono{font-family:var(--mono)}
+
+  /* ---------- NAV ---------- */
+  nav.top{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+    padding:18px 40px;backdrop-filter:blur(14px);background:rgba(12,13,16,.55);border-bottom:1px solid var(--line);transition:.3s}
+  .logo{display:flex;align-items:center;gap:11px;font-family:var(--serif);font-size:23px;font-weight:500;letter-spacing:-.01em}
+  .logo .mark{width:30px;height:30px;border-radius:9px;background:var(--accent);position:relative;flex:none;
+    display:grid;place-items:center}
+  .logo .mark::before{content:"";width:11px;height:11px;border:2.5px solid var(--ink);border-radius:50%}
+  .logo .mark::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--ink);right:6px;bottom:6px}
+  .navlinks{display:flex;gap:34px;font-size:15px;color:var(--txt-dim)}
+  .navlinks a:hover{color:var(--txt)}
+  @media(max-width:880px){.navlinks{display:none}nav.top{padding:16px 20px}}
+
+  /* ---------- HERO ---------- */
+  header.hero{padding:170px 40px 90px;max-width:1180px;margin:0 auto;text-align:center}
+  .hero h1{font-family:var(--serif);font-weight:300;font-size:clamp(40px,7vw,84px);line-height:1.02;letter-spacing:-.02em;max-width:14ch;margin:26px auto 0}
+  .hero h1 em{font-style:italic;color:var(--accent)}
+  .hero p.sub{max-width:62ch;margin:26px auto 0;font-size:clamp(16px,2vw,19px);color:var(--txt-dim);line-height:1.6}
+  .hero .cta{display:flex;gap:14px;justify-content:center;margin-top:38px;flex-wrap:wrap}
+  .reveal{opacity:0;transform:translateY(22px);animation:rise .9s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .d1{animation-delay:.05s}.d2{animation-delay:.18s}.d3{animation-delay:.32s}.d4{animation-delay:.46s}.d5{animation-delay:.6s}
+
+  /* hero preview */
+  .hero-prev{margin:64px auto 0;max-width:1060px;border-radius:24px;border:1px solid var(--line-strong);
+    background:linear-gradient(180deg,rgba(245,242,234,.04),rgba(245,242,234,.01));
+    box-shadow:0 50px 120px -40px rgba(0,0,0,.7);overflow:hidden}
+  .hero-prev .bar{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .hero-prev .bar i{width:11px;height:11px;border-radius:50%;background:var(--line-strong);display:inline-block}
+  .hero-prev .bar .url{margin-left:14px;font-family:var(--mono);font-size:12px;color:var(--txt-dim)}
+  .hero-prev .body{display:grid;grid-template-columns:1.3fr 1fr;gap:1px;background:var(--line);min-height:300px}
+  .hero-prev .body>div{background:var(--bg-2);padding:26px}
+  .scorebig{font-family:var(--serif);font-size:72px;line-height:1;color:var(--accent)}
+  .ringrow{display:flex;gap:22px;flex-wrap:wrap;margin-top:18px}
+  .ring{--v:80;width:74px;height:74px;border-radius:50%;display:grid;place-items:center;position:relative;
+    background:conic-gradient(var(--accent) calc(var(--v)*1%),rgba(245,242,234,.08) 0)}
+  .ring::before{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--bg-2)}
+  .ring span{position:relative;font-weight:700;font-size:18px}
+  .ring small{display:block;text-align:center;font-size:11px;color:var(--txt-dim);margin-top:8px}
+  .crit{display:flex;flex-direction:column;gap:12px}
+  .crit .item{border-left:2px solid var(--coral);padding:6px 0 6px 12px;font-size:13px;color:var(--txt-dim)}
+  .crit .item b{color:var(--txt);font-weight:600;display:block;font-size:13px}
+  @media(max-width:760px){.hero-prev .body{grid-template-columns:1fr}}
+
+  /* ---------- marquee logos ---------- */
+  .trust{padding:50px 40px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:90px}
+  .trust p{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:24px}
+  .trust .row{display:flex;gap:46px;justify-content:center;flex-wrap:wrap;font-family:var(--serif);font-size:22px;color:rgba(245,242,234,.5)}
+
+  /* ---------- sections ---------- */
+  section{max-width:1180px;margin:0 auto;padding:100px 40px}
+  .sec-head{max-width:60ch}
+  .sec-head .pill{margin-bottom:20px}
+  .sec-head h2{font-family:var(--serif);font-weight:300;font-size:clamp(30px,4.6vw,52px);line-height:1.06;letter-spacing:-.02em}
+  .sec-head p{color:var(--txt-dim);font-size:18px;margin-top:16px}
+
+  /* bento */
+  .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-top:48px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:linear-gradient(180deg,rgba(245,242,234,.035),rgba(245,242,234,.008));
+    transition:.3s;position:relative;overflow:hidden}
+  .card:hover{border-color:var(--line-strong);transform:translateY(-4px)}
+  .card .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:rgba(205,245,100,.12);
+    margin-bottom:16px;font-size:20px}
+  .card h3{font-size:19px;font-weight:600;margin-bottom:8px;letter-spacing:-.01em}
+  .card p{color:var(--txt-dim);font-size:14.5px;line-height:1.55}
+  .col-3{grid-column:span 3}.col-2{grid-column:span 2}.col-4{grid-column:span 4}.col-6{grid-column:span 6}
+  .card.feature-big{display:flex;flex-direction:column;justify-content:space-between;min-height:230px;
+    background:linear-gradient(135deg,rgba(205,245,100,.1),rgba(245,242,234,.01))}
+  @media(max-width:860px){.bento{grid-template-columns:1fr}.card{grid-column:span 1!important}}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:48px}
+  .step{border-top:1px solid var(--line-strong);padding-top:20px}
+  .step .n{font-family:var(--serif);font-size:46px;color:var(--accent);line-height:1}
+  .step h4{margin:14px 0 8px;font-size:17px;font-weight:600}
+  .step p{color:var(--txt-dim);font-size:14px}
+  @media(max-width:860px){.steps{grid-template-columns:1fr 1fr}}
+
+  /* pricing */
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+  .price{border:1px solid var(--line);border-radius:var(--radius);padding:32px}
+  .price.pop{border-color:var(--accent);background:linear-gradient(180deg,rgba(205,245,100,.08),transparent)}
+  .price h4{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-dim)}
+  .price .amt{font-family:var(--serif);font-size:54px;margin:14px 0 4px}
+  .price .amt span{font-size:17px;color:var(--txt-dim);font-family:var(--sans)}
+  .price ul{list-style:none;margin:24px 0;display:flex;flex-direction:column;gap:12px}
+  .price li{font-size:14.5px;color:var(--txt-dim);display:flex;gap:10px}
+  .price li::before{content:"→";color:var(--accent)}
+  .price .btn{width:100%;justify-content:center}
+  @media(max-width:860px){.prices{grid-template-columns:1fr}}
+
+  /* faq */
+  .faq{margin-top:40px;max-width:840px}
+  .qa{border-bottom:1px solid var(--line);padding:22px 0}
+  .qa summary{font-size:18px;font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  .qa summary::-webkit-details-marker{display:none}
+  .qa summary::after{content:"▾";color:var(--accent);font-size:18px;font-weight:400}
+  .qa[open] summary::after{content:"▴"}
+  .qa p{color:var(--txt-dim);margin-top:14px;font-size:15px;line-height:1.6}
+
+  footer{border-top:1px solid var(--line);padding:60px 40px 40px;max-width:1180px;margin:0 auto}
+  .foot-top{display:flex;justify-content:space-between;flex-wrap:wrap;gap:30px}
+  .foot-cols{display:flex;gap:60px;flex-wrap:wrap}
+  .foot-cols h5{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-dim);margin-bottom:16px}
+  .foot-cols a{display:block;color:var(--txt-dim);font-size:14px;margin-bottom:10px}
+  .foot-cols a:hover{color:var(--txt)}
+  .foot-bottom{margin-top:50px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;
+    color:var(--txt-dim);font-size:13px;flex-wrap:wrap;gap:12px}
+
+  /* =================== APP =================== */
+  #view-app{display:none;min-height:100vh;grid-template-columns:248px 1fr}
+  #view-app.on{display:grid}
+  .sidebar{border-right:1px solid var(--line);padding:22px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:rgba(12,13,16,.6)}
+  .sidebar .logo{margin:6px 8px 26px;font-size:20px}
+  .navitem{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:11px;color:var(--txt-dim);font-size:14.5px;font-weight:500;transition:.2s;width:100%;text-align:left}
+  .navitem:hover{background:rgba(245,242,234,.05);color:var(--txt)}
+  .navitem.active{background:rgba(205,245,100,.12);color:var(--accent)}
+  .navitem .gi{width:20px;text-align:center;font-size:16px;flex:none}
+  .sidebar .sec-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-dim);margin:22px 13px 8px;opacity:.7}
+  .sidebar .user{margin-top:auto;display:flex;align-items:center;gap:11px;padding:12px 8px;border-top:1px solid var(--line)}
+  .sidebar .user .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--coral));flex:none}
+  .sidebar .user b{font-size:13.5px;display:block}
+  .sidebar .user small{font-size:11.5px;color:var(--txt-dim)}
+
+  .main{padding:28px 36px 60px;overflow-x:hidden}
+  .apptop{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;flex-wrap:wrap;gap:14px}
+  .apptop h1{font-family:var(--serif);font-weight:400;font-size:33px;letter-spacing:-.01em}
+  .apptop .sub{color:var(--txt-dim);font-size:14px;margin-top:2px}
+  .pane{display:none;animation:fade .4s ease}
+  .pane.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .stat{border:1px solid var(--line);border-radius:var(--radius);padding:22px;background:linear-gradient(180deg,rgba(245,242,234,.03),transparent)}
+  .stat .lbl{font-size:13px;color:var(--txt-dim)}
+  .stat .v{font-family:var(--serif);font-size:42px;margin-top:8px;line-height:1}
+  .stat .chg{font-size:12.5px;margin-top:8px;display:inline-flex;gap:5px;align-items:center}
+  .up{color:var(--good)}.down{color:var(--bad)}
+  @media(max-width:1000px){.stats{grid-template-columns:1fr 1fr}}
+
+  .grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-top:16px}
+  @media(max-width:1000px){.grid2{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line);border-radius:var(--radius);padding:24px;background:linear-gradient(180deg,rgba(245,242,234,.025),transparent)}
+  .panel h3{font-size:16px;font-weight:600;margin-bottom:4px}
+  .panel .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .panel .ph small{color:var(--txt-dim);font-size:13px}
+
+  /* chart */
+  .chart{height:200px;width:100%;display:block}
+  .recent{display:flex;flex-direction:column;gap:2px}
+  .rrow{display:flex;align-items:center;gap:13px;padding:12px 8px;border-radius:10px;transition:.2s;cursor:pointer}
+  .rrow:hover{background:rgba(245,242,234,.04)}
+  .rrow .thumb{width:44px;height:34px;border-radius:7px;flex:none;background-size:cover;background-position:center;border:1px solid var(--line)}
+  .rrow .meta{flex:1;min-width:0}
+  .rrow .meta b{font-size:14px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .meta small{font-size:12px;color:var(--txt-dim)}
+  .rrow .sc{font-family:var(--serif);font-size:22px}
+
+  /* upload */
+  .drop{border:2px dashed var(--line-strong);border-radius:24px;padding:60px 30px;text-align:center;transition:.3s;cursor:pointer;
+    background:linear-gradient(180deg,rgba(245,242,234,.02),transparent)}
+  .drop.drag{border-color:var(--accent);background:rgba(205,245,100,.06)}
+  .drop .big{width:64px;height:64px;border-radius:18px;background:rgba(205,245,100,.12);display:grid;place-items:center;margin:0 auto 18px;font-size:28px}
+  .drop h3{font-family:var(--serif);font-weight:400;font-size:26px}
+  .drop p{color:var(--txt-dim);margin-top:8px;font-size:14.5px}
+  .samples{display:flex;gap:12px;justify-content:center;margin-top:26px;flex-wrap:wrap}
+  .samples .s{width:120px;cursor:pointer;text-align:center}
+  .samples .s .pv{height:78px;border-radius:10px;border:1px solid var(--line);overflow:hidden;transition:.25s}
+  .samples .s:hover .pv{border-color:var(--accent);transform:translateY(-3px)}
+  .samples .s small{display:block;margin-top:8px;font-size:12px;color:var(--txt-dim)}
+
+  .analyzing{text-align:center;padding:80px 20px;display:none}
+  .analyzing.on{display:block}
+  .analyzing .prog{max-width:420px;margin:30px auto 0;text-align:left}
+  .analyzing .pstep{display:flex;align-items:center;gap:12px;padding:9px 0;color:var(--txt-dim);font-size:14.5px;opacity:.4;transition:.4s}
+  .analyzing .pstep.done{opacity:1;color:var(--txt)}
+  .analyzing .pstep .chk{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line-strong);display:grid;place-items:center;flex:none;font-size:11px}
+  .analyzing .pstep.done .chk{background:var(--accent);border-color:var(--accent);color:var(--ink)}
+  .spinner{width:46px;height:46px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;margin:0 auto;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* results */
+  .results{display:none}
+  .results.on{display:block}
+  .res-grid{display:grid;grid-template-columns:340px 1fr;gap:18px;margin-top:8px}
+  @media(max-width:980px){.res-grid{grid-template-columns:1fr}}
+  .preview-img{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+  .imeta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .tag{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:5px 10px;color:var(--txt-dim)}
+  .tag b{color:var(--txt)}
+
+  .scorecards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .scard{border:1px solid var(--line);border-radius:14px;padding:20px;text-align:center}
+  .scard .ring{margin:0 auto 12px}
+  .scard h4{font-size:13px;color:var(--txt-dim);font-weight:600}
+
+  .heur{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:18px}
+  .hcell{border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+  .hcell .hh{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+  .hcell .hh b{font-size:14px}
+  .hcell .hh .sc{font-family:var(--mono);font-size:13px}
+  .bar{height:6px;border-radius:99px;background:rgba(245,242,234,.08);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+  @media(max-width:680px){.heur,.scorecards{grid-template-columns:1fr}}
+
+  .critlist{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+  .citem{border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:grid;grid-template-columns:8px 1fr;gap:14px}
+  .citem .sev{width:8px;border-radius:99px}
+  .sev.high{background:var(--bad)}.sev.med{background:var(--warn)}.sev.low{background:var(--good)}
+  .citem .ctxt b{font-size:14.5px;display:block;margin-bottom:6px}
+  .citem .ctxt .row{display:grid;grid-template-columns:90px 1fr;gap:8px;font-size:13.5px;color:var(--txt-dim);margin-top:6px}
+  .citem .ctxt .row span:first-child{color:var(--accent);font-weight:600}
+
+  .palette{display:flex;gap:0;border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-top:8px}
+  .sw{flex:1;height:110px;display:flex;align-items:flex-end;padding:10px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:.2s}
+  .sw:hover{flex:1.4}
+  .typo{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+  .typo .t{border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .typo .t .ex{font-size:24px;margin-bottom:6px}
+  .typo .t small{color:var(--txt-dim);font-size:12.5px;font-family:var(--mono)}
+
+  .tabs{display:flex;gap:8px;margin:22px 0 18px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .tab{padding:11px 16px;color:var(--txt-dim);font-size:14.5px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.active{color:var(--accent);border-color:var(--accent)}
+  .tabpane{display:none}.tabpane.on{display:block}
+
+  .tokens{font-family:var(--mono);font-size:12.5px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:18px;overflow:auto;line-height:1.7;color:var(--txt-dim);margin-top:8px}
+  .tokens .k{color:var(--accent)}.tokens .s{color:var(--coral)}
+
+  .empty{text-align:center;padding:70px 20px;color:var(--txt-dim)}
+  .empty .big{font-size:40px;margin-bottom:14px}
+
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(120px);z-index:99;
+    background:var(--paper);color:var(--ink);padding:13px 22px;border-radius:12px;font-weight:600;font-size:14px;transition:.4s;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+  .toast.on{transform:translateX(-50%) translateY(0)}
+  .note{font-size:12.5px;color:var(--txt-dim);border:1px dashed var(--line-strong);border-radius:10px;padding:12px 14px;margin-top:18px;line-height:1.5}
+  .mobile-only-warn{display:none}
+  @media(max-width:780px){#view-app .sidebar{position:fixed;z-index:60;transform:translateX(-100%);transition:.3s}
+    #view-app .sidebar.show{transform:none}#view-app{grid-template-columns:1fr}.menu-btn{display:grid!important}}
+  .menu-btn{display:none;width:40px;height:40px;border:1px solid var(--line-strong);border-radius:10px;place-items:center;font-size:18px}
+  /* senior polish: focus, motion, scroll-reveal */
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+  .io{opacity:0;transform:translateY(22px)}
+  .io.in{opacity:1;transform:none;transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+    .reveal,.io{opacity:1!important;transform:none!important}
+  }
+  /* AI Studio: chat, agents, personas, before/after */
+  .chat{height:min(46vh,460px);overflow-y:auto;padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:78%;padding:13px 16px;border-radius:16px;font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+  .msg.bot{align-self:flex-start;background:rgba(245,242,234,.06);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .msg.user{align-self:flex-end;background:var(--accent);color:var(--ink);border-bottom-right-radius:5px}
+  .msg.typing{align-self:flex-start;color:var(--txt-dim);font-style:italic}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 24px 14px}
+  .chip{font-size:13px;border:1px solid var(--line-strong);border-radius:999px;padding:7px 13px;color:var(--txt-dim);transition:.2s}
+  .chip:hover{border-color:var(--accent);color:var(--txt)}
+  .chatbar{display:flex;gap:10px;padding:16px 24px;border-top:1px solid var(--line)}
+  .chatbar input{flex:1;background:var(--bg-2);border:1px solid var(--line-strong);color:var(--txt);border-radius:999px;padding:13px 18px;font-family:var(--sans);font-size:15px}
+  .chatbar input:focus{outline:none;border-color:var(--accent)}
+
+  .agentcard{border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+  .agentcard .ah{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .agentcard .ai{width:34px;height:34px;border-radius:10px;background:rgba(205,245,100,.12);display:grid;place-items:center;font-size:16px;flex:none}
+  .agentcard .ah b{font-size:14.5px}
+  .agentcard .ah small{color:var(--txt-dim);font-size:12px}
+  .agentcard .ah .st{margin-left:auto;font-size:11px;color:var(--good);display:flex;align-items:center;gap:5px}
+  .agentcard .ah .st::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--good)}
+  .agentcard ul{list-style:none;display:flex;flex-direction:column;gap:7px}
+  .agentcard li{font-size:13.5px;color:var(--txt-dim);padding-left:16px;position:relative}
+  .agentcard li::before{content:"›";position:absolute;left:0;color:var(--accent)}
+  .coord{border:1px solid var(--accent);border-radius:14px;padding:18px 20px;background:linear-gradient(180deg,rgba(205,245,100,.09),transparent);margin-top:6px}
+  .coord b{font-size:14.5px}
+  .coord p{font-size:14px;color:var(--txt-dim);margin-top:8px;line-height:1.6}
+
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+  .ba .col{border:1px solid var(--line);border-radius:14px;padding:18px}
+  .ba .col.after{border-color:var(--accent);background:linear-gradient(180deg,rgba(205,245,100,.07),transparent)}
+  .ba .col h5{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:12px}
+  .ba .col.after h5{color:var(--accent)}
+  .ba ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .ba li{font-size:13.5px;padding-left:18px;position:relative;color:var(--txt-dim)}
+  .ba li::before{content:"•";position:absolute;left:2px;color:var(--accent)}
+  @media(max-width:680px){.ba{grid-template-columns:1fr}}
+
+  .specgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+  .specgrid .blk{border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .specgrid .blk h5{font-size:13px;color:var(--accent);margin-bottom:10px}
+  .specgrid .blk ul{list-style:none;display:flex;flex-direction:column;gap:7px}
+  .specgrid .blk li{font-size:13px;color:var(--txt-dim);padding-left:14px;position:relative}
+  .specgrid .blk li::before{content:"–";position:absolute;left:0;color:var(--txt-dim)}
+  @media(max-width:680px){.specgrid{grid-template-columns:1fr}}
+
+  .persona{border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:12px}
+  .persona .ph2{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .persona .ph2 .pi{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:15px;flex:none;background:rgba(245,242,234,.07)}
+  .persona .ph2 b{font-size:14.5px}
+  .persona .ph2 .fit{margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--accent);border:1px solid var(--line-strong);border-radius:999px;padding:3px 10px}
+  .persona .pcols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .persona .pcols h6{font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+  .persona .pcols ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+  .persona .pcols li{font-size:12.5px;color:var(--txt-dim);line-height:1.45}
+  .like h6{color:var(--good)}.concern h6{color:var(--warn)}.miss h6{color:var(--bad)}
+  @media(max-width:680px){.persona .pcols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============ LANDING ============ -->
+<div id="view-landing">
+  <nav class="top">
+    <div class="logo"><span class="mark"></span>Lumen</div>
+    <div class="navlinks">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <button class="btn btn-primary" onclick="enterApp()">Start Free Analysis</button>
+  </nav>
+
+  <header class="hero">
+    <span class="pill reveal d1"><span class="dot"></span>AI Powered Design Intelligence</span>
+    <h1 class="reveal d2">Turn any design into <em>actionable</em> UX insights using AI</h1>
+    <p class="sub reveal d3">Upload screenshots, wireframes, or product designs and receive instant AI powered UX audits, accessibility checks, design critiques, and improvement recommendations, in seconds, not hours.</p>
+    <div class="cta reveal d4">
+      <button class="btn btn-primary" onclick="enterApp()">Start Free Analysis →</button>
+    </div>
+
+    <div class="hero-prev reveal d5">
+      <div class="bar"><i></i><i></i><i></i><span class="url">app.lumen.design/analysis/checkoutv3</span></div>
+      <div class="body">
+        <div>
+          <div class="pill" style="margin-bottom:18px"><span class="dot"></span>Overall UX Score</div>
+          <div class="scorebig">82<span style="font-size:28px;color:var(--txt-dim)">/100</span></div>
+          <div class="ringrow">
+            <div><div class="ring" style="--v:74"><span>74</span></div><small>Accessibility</small></div>
+            <div><div class="ring" style="--v:88"><span>88</span></div><small>Hierarchy</small></div>
+            <div><div class="ring" style="--v:79"><span>79</span></div><small>Heuristics</small></div>
+          </div>
+        </div>
+        <div>
+          <div class="pill" style="margin-bottom:18px">Top critiques</div>
+          <div class="crit">
+            <div class="item"><b>Primary CTA is visually weak</b>Low contrast against the section background reduces tap intent.</div>
+            <div class="item"><b>Form has 9 fields</b>Reduce to essential 4 to cut friction at checkout.</div>
+            <div class="item"><b>Navigation lacks hierarchy</b>All items share equal weight; emphasize the primary path.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="trust">
+    <p>Built for the teams behind great products</p>
+    <div class="row"><span>Figma</span><span>Linear</span><span>Notion</span><span>Framer</span><span>Stripe</span><span>Vercel</span></div>
+  </div>
+
+  <!-- features -->
+  <section id="features">
+    <div class="sec-head">
+      <span class="pill"><span class="dot"></span>Capabilities</span>
+      <h2>Everything a senior design reviewer does, automated.</h2>
+      <p>Ten analysis engines work together to evaluate your interface the way a principal designer would, grounded in established UX and accessibility standards.</p>
+    </div>
+    <div class="bento">
+      <div class="card col-3 feature-big">
+        <div><div class="ic">◎</div><h3>Vision UI mapping</h3><p>Detects buttons, forms, cards, navigation, inputs and typography from a single screenshot to build a structured map of your interface.</p></div>
+      </div>
+      <div class="card col-3 feature-big">
+        <div><div class="ic">⊹</div><h3>Accessibility analyzer</h3><p>WCAG contrast, font sizing, touch target and spacing checks with a graded score and concrete fixes for each violation.</p></div>
+      </div>
+      <div class="card col-2"><div class="ic">◈</div><h3>Heuristic evaluation</h3><p>Scored against Nielsen's 10 usability heuristics.</p></div>
+      <div class="card col-2"><div class="ic">▤</div><h3>Visual hierarchy</h3><p>CTA visibility, grouping, alignment and whitespace.</p></div>
+      <div class="card col-2"><div class="ic">✎</div><h3>Critique engine</h3><p>Issue → impact → recommendation, written like a real review.</p></div>
+      <div class="card col-3"><div class="ic">⬡</div><h3>Design system extraction</h3><p>Pull colors, type scale, spacing and components into exportable design tokens.</p></div>
+      <div class="card col-3"><div class="ic">◐</div><h3>Palette & typography AI</h3><p>Industry tuned color systems and font pairing recommendations tailored to your product domain.</p></div>
+    </div>
+  </section>
+
+  <!-- how -->
+  <section id="how">
+    <div class="sec-head">
+      <span class="pill"><span class="dot"></span>How it works</span>
+      <h2>From upload to insight in four steps.</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><h4>Upload</h4><p>Drop a screenshot, mockup, or wireframe. PNG, JPG, WEBP, drag & drop.</p></div>
+      <div class="step"><div class="n">02</div><h4>Analyze</h4><p>Vision AI maps the interface and the analysis engines go to work.</p></div>
+      <div class="step"><div class="n">03</div><h4>Review</h4><p>Get scores, heuristics, critique, palette and typography breakdowns.</p></div>
+      <div class="step"><div class="n">04</div><h4>Export</h4><p>Download a PDF/CSV report or export design tokens as JSON.</p></div>
+    </div>
+  </section>
+
+  <!-- pricing -->
+  <section id="pricing">
+    <div class="sec-head">
+      <span class="pill"><span class="dot"></span>Pricing</span>
+      <h2>Start free. Scale when your team does.</h2>
+    </div>
+    <div class="prices">
+      <div class="price"><h4>Starter</h4><div class="amt">$0<span>/mo</span></div><p style="color:var(--txt-dim);font-size:14px">For students & solo explorers.</p>
+        <ul><li>5 analyses / month</li><li>Accessibility + UX scores</li><li>Color palette export</li><li>Community support</li></ul>
+        <button class="btn btn-ghost" onclick="enterApp()">Get started</button></div>
+      <div class="price pop"><h4>Pro</h4><div class="amt">$24<span>/mo</span></div><p style="color:var(--txt-dim);font-size:14px">For working designers.</p>
+        <ul><li>Unlimited analyses</li><li>All 10 analysis engines</li><li>PDF & CSV reports</li><li>Design system + tokens</li><li>Wireframe generator</li></ul>
+        <button class="btn btn-primary" onclick="enterApp()">Start Pro trial</button></div>
+      <div class="price"><h4>Team</h4><div class="amt">$79<span>/mo</span></div><p style="color:var(--txt-dim);font-size:14px">For agencies & product teams.</p>
+        <ul><li>Everything in Pro</li><li>Shared workspaces</li><li>Comments & review history</li><li>Role permissions</li><li>Priority support</li></ul>
+        <button class="btn btn-ghost" onclick="enterApp()">Contact sales</button></div>
+    </div>
+  </section>
+
+  <!-- faq -->
+  <section id="faq">
+    <div class="sec-head"><span class="pill"><span class="dot"></span>FAQ</span><h2>Questions, answered.</h2></div>
+    <div class="faq">
+      <details class="qa" open><summary>What can I upload?</summary><p>Any static interface as PNG, JPG, JPEG or WEBP: website screenshots, mobile app screens, dashboards, wireframes or design mockups. Lumen detects the device type automatically from the aspect ratio.</p></details>
+      <details class="qa"><summary>What standards does the analysis use?</summary><p>Accessibility checks follow WCAG 2.1 contrast and sizing guidance; usability scoring is mapped to Nielsen's 10 heuristics; hierarchy analysis evaluates CTA prominence, grouping, alignment and whitespace.</p></details>
+      <details class="qa"><summary>Can I export the results?</summary><p>Yes, generate a polished PDF or CSV report, and export the extracted design system as JSON design tokens ready to drop into your codebase.</p></details>
+      <details class="qa"><summary>Is my design data private?</summary><p>Uploads are processed for analysis only and never used to train models. Team workspaces support role based access control.</p></details>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot-top">
+      <div style="max-width:320px">
+        <div class="logo" style="font-size:22px"><span class="mark"></span>Lumen</div>
+        <p style="color:var(--txt-dim);font-size:14px;margin-top:16px">AI design intelligence for designers, founders and product teams.</p>
+      </div>
+      <div class="foot-cols">
+        <div><h5>Product</h5><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#" onclick="enterApp();return false">Dashboard</a></div>
+        <div><h5>Resources</h5><a href="#faq">FAQ</a><a href="#">Docs</a><a href="#">Changelog</a></div>
+        <div><h5>Company</h5><a href="#">About</a><a href="#">Careers</a><a href="#">Contact</a></div>
+      </div>
+    </div>
+    <div class="foot-bottom"><span>© 2026 Lumen Labs · a prototype concept.</span><span>Privacy · Terms · Security</span></div>
+  </footer>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="view-app">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo"><span class="mark"></span>Lumen</div>
+    <button class="navitem active" data-pane="dash"><span class="gi">▦</span>Dashboard</button>
+    <button class="navitem" data-pane="analyze"><span class="gi">✦</span>Analyze Design</button>
+    <button class="navitem" data-pane="reports"><span class="gi">▭</span>Reports</button>
+    <div class="sec-label">Create</div>
+    <button class="navitem" data-pane="system"><span class="gi">⬡</span>Design Systems</button>
+    <button class="navitem" data-pane="palette"><span class="gi">◐</span>Palette Studio</button>
+    <button class="navitem" data-pane="suggest"><span class="gi">✎</span>AI Suggestions</button>
+    <div class="sec-label">AI Studio</div>
+    <button class="navitem" data-pane="mentor"><span class="gi">✸</span>AI Mentor</button>
+    <button class="navitem" data-pane="portfolio"><span class="gi">★</span>Portfolio Lab</button>
+    <div class="sec-label">Workspace</div>
+    <button class="navitem" data-pane="team"><span class="gi">◍</span>Team</button>
+    <button class="navitem" data-pane="settings"><span class="gi">⚙</span>Settings</button>
+    <div class="user"><div class="av"></div><div><b>Anuhya L.</b><small>Pro · Jersey City</small></div></div>
+    <button class="navitem" style="margin-top:8px" onclick="exitApp()"><span class="gi">←</span>Back to site</button>
+  </aside>
+
+  <main class="main">
+    <div class="apptop">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('show')">☰</button>
+        <div><h1 id="paneTitle">Dashboard</h1><div class="sub" id="paneSub">Welcome back. Here's your design health overview.</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="go('analyze')">+ New Analysis</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="pane on" id="pane-dash">
+      <div class="stats">
+        <div class="stat"><div class="lbl">Total analyses</div><div class="v">47</div><div class="chg up">▲ 12 this month</div></div>
+        <div class="stat"><div class="lbl">Avg. UX score</div><div class="v">81</div><div class="chg up">▲ 6 vs last month</div></div>
+        <div class="stat"><div class="lbl">Accessibility</div><div class="v">73</div><div class="chg down">▼ 3 needs attention</div></div>
+        <div class="stat"><div class="lbl">Designs reviewed</div><div class="v">39</div><div class="chg up">▲ 8 this week</div></div>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <div class="ph"><div><h3>Improvement trend</h3><small>Average UX score over the last 8 weeks</small></div></div>
+          <svg class="chart" id="trendChart" viewBox="0 0 600 200" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="panel">
+          <div class="ph"><h3>Recent designs</h3><small>Tap to view</small></div>
+          <div class="recent" id="recentList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYZE -->
+    <div class="pane" id="pane-analyze">
+      <div class="panel" id="uploadPanel">
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload a design image">
+          <div class="big">⤓</div>
+          <h3>Drop your design here</h3>
+          <p>PNG, JPG, JPEG or WEBP · or click to browse · drag & drop supported</p>
+          <input type="file" id="fileInput" accept="image/*" hidden>
+        </div>
+        <div style="text-align:center;margin-top:24px;color:var(--txt-dim);font-size:13px">No screenshot handy? Try a sample:</div>
+        <div class="samples" id="samples"></div>
+        <div class="note">⚠︎ This is a working prototype. Color palette extraction and WCAG contrast scoring run for real in your browser. Heuristic scores and critique text are illustrative, in the production build these come from the Vision + LLM pipeline described in the architecture doc.</div>
+      </div>
+
+      <div class="analyzing" id="analyzing">
+        <div class="spinner"></div>
+        <h3 style="font-family:var(--serif);font-weight:400;font-size:26px;margin-top:22px">Analyzing your design…</h3>
+        <div class="prog" id="progList"></div>
+      </div>
+
+      <div class="results" id="results"></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="pane" id="pane-reports">
+      <div class="panel"><div class="ph"><div><h3>Saved reports</h3><small>Export as PDF or CSV</small></div></div>
+        <div class="recent" id="reportsList"></div>
+      </div>
+    </div>
+
+    <!-- DESIGN SYSTEM -->
+    <div class="pane" id="pane-system">
+      <div class="empty"><div class="big">⬡</div><h3 style="font-family:var(--serif);font-weight:400;font-size:24px;color:var(--txt)">Design System Generator</h3>
+        <p style="margin-top:10px">Run an analysis first. Lumen extracts colors, typography, spacing and components into exportable design tokens.</p>
+        <button class="btn btn-primary" style="margin-top:20px" onclick="go('analyze')">Analyze a design →</button></div>
+    </div>
+
+    <!-- PALETTE STUDIO -->
+    <div class="pane" id="pane-palette">
+      <div class="panel">
+        <div class="ph"><div><h3>AI Palette Studio</h3><small>Generate an industry tuned color system</small></div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px" id="industryBtns"></div>
+        <div class="palette" id="genPalette"></div>
+        <div style="margin-top:14px;color:var(--txt-dim);font-size:13.5px" id="paletteDesc"></div>
+      </div>
+    </div>
+
+    <!-- AI SUGGESTIONS -->
+    <div class="pane" id="pane-suggest">
+      <div class="panel"><div class="ph"><h3>AI Redesign Suggestions</h3></div>
+        <p style="color:var(--txt-dim);font-size:14.5px;max-width:60ch">After an analysis, Lumen proposes concrete redesign concepts, pairing your current layout against an improved version with reasoning for each change. Run an analysis to populate suggestions.</p>
+        <button class="btn btn-ghost" style="margin-top:18px" onclick="go('analyze')">Start an analysis</button>
+      </div>
+    </div>
+
+    <!-- TEAM -->
+    <div class="pane" id="pane-team">
+      <div class="panel"><div class="ph"><div><h3>Team Workspace</h3><small>Collaborate, comment, review</small></div></div>
+        <div class="recent">
+          <div class="rrow"><div class="av" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--coral))"></div><div class="meta"><b>Anuhya L.</b><small>Owner · can manage workspace</small></div></div>
+          <div class="rrow"><div class="av" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#7a8cff,#cdf564)"></div><div class="meta"><b>Design Reviewer</b><small>Editor · can analyze & comment</small></div></div>
+          <div class="rrow"><div class="av" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ff6a45,#7a8cff)"></div><div class="meta"><b>Stakeholder</b><small>Viewer · read only access</small></div></div>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:16px" onclick="toast('Invite link copied')">+ Invite member</button>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="pane" id="pane-settings">
+      <div class="panel"><div class="ph"><h3>Settings</h3></div>
+        <div class="heur" style="grid-template-columns:1fr 1fr">
+          <div class="hcell"><b>Profile</b><p style="color:var(--txt-dim);font-size:13.5px;margin-top:8px">Anuhya L. · anuhya@example.com</p></div>
+          <div class="hcell"><b>Plan</b><p style="color:var(--txt-dim);font-size:13.5px;margin-top:8px">Pro · renews monthly</p></div>
+          <div class="hcell"><b>Theme</b><p style="color:var(--txt-dim);font-size:13.5px;margin-top:8px">Dark (editorial)</p></div>
+          <div class="hcell"><b>Notifications</b><p style="color:var(--txt-dim);font-size:13.5px;margin-top:8px">Email on completed analyses</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI MENTOR -->
+    <div class="pane" id="pane-mentor">
+      <div class="panel" style="padding:0;overflow:hidden">
+        <div class="ph" style="padding:20px 24px;border-bottom:1px solid var(--line);margin:0">
+          <div><h3>AI Design Mentor</h3><small>A senior UX consultant, powered by Groq</small></div>
+          <span class="pill"><span class="dot"></span>RAG grounded</span>
+        </div>
+        <div class="chat" id="chatLog"></div>
+        <div class="chips" id="chatChips"></div>
+        <div class="chatbar">
+          <input id="chatInput" type="text" placeholder="Ask about UX, accessibility, conversion, your portfolio…" autocomplete="off">
+          <button class="btn btn-primary" id="chatSend">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PORTFOLIO LAB -->
+    <div class="pane" id="pane-portfolio">
+      <div class="panel" id="portfolioInput">
+        <div class="ph"><div><h3>Portfolio Lab</h3><small>Recruiter readiness review for designers &amp; job seekers</small></div></div>
+        <p style="color:var(--txt-dim);font-size:14.5px;max-width:62ch">Drop in your portfolio link and Lumen simulates how three different recruiters would react, then scores your recruiter readiness and lists what to fix first.</p>
+        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+          <input id="pfUrl" type="text" placeholder="yourname.portfolio.com" autocomplete="off"
+            style="flex:1;min-width:240px;background:var(--bg-2);border:1px solid var(--line-strong);color:var(--txt);border-radius:12px;padding:13px 16px;font-family:var(--sans);font-size:15px">
+          <button class="btn btn-primary" id="pfRun">Run review</button>
+        </div>
+        <div class="note">Simulated for the prototype, seeded from your input. The production build sends the case study text through the Groq portfolio review agent.</div>
+      </div>
+      <div id="portfolioResults"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ---------------- view switching ---------------- */
+function enterApp(pane){
+  document.getElementById('view-landing').style.display='none';
+  document.getElementById('view-app').classList.add('on');
+  window.scrollTo(0,0);
+  if(pane) go(pane);
+}
+function exitApp(){
+  document.getElementById('view-app').classList.remove('on');
+  document.getElementById('view-landing').style.display='block';
+  window.scrollTo(0,0);
+}
+const titles={dash:['Dashboard',"Welcome back. Here's your design health overview."],
+  analyze:['Analyze Design','Upload an interface to run the full AI audit.'],
+  reports:['Reports','Download polished PDF & CSV reports.'],
+  system:['Design Systems','Extract tokens from any analyzed design.'],
+  palette:['Palette Studio','Generate industry tuned color systems.'],
+  suggest:['AI Suggestions','AI proposed redesign concepts.'],
+  mentor:['AI Mentor','Ask a senior UX consultant anything.'],
+  portfolio:['Portfolio Lab','See how recruiters react to your portfolio.'],
+  team:['Team Workspace','Collaborate with your team.'],
+  settings:['Settings','Manage your account & preferences.']};
+function go(pane){
+  document.querySelectorAll('.navitem[data-pane]').forEach(n=>n.classList.toggle('active',n.dataset.pane===pane));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pane-'+pane).classList.add('on');
+  document.getElementById('paneTitle').textContent=titles[pane][0];
+  document.getElementById('paneSub').textContent=titles[pane][1];
+  document.getElementById('sidebar').classList.remove('show');
+  if(pane==='analyze')resetAnalyze();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.navitem[data-pane]').forEach(n=>n.addEventListener('click',()=>go(n.dataset.pane)));
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+function copy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).catch(()=>{});}}catch(e){}}
+
+/* ---------------- nav scroll style ---------------- */
+window.addEventListener('scroll',()=>{const n=document.querySelector('nav.top');if(n)n.style.background=window.scrollY>40?'rgba(12,13,16,.85)':'rgba(12,13,16,.55)';});
+
+/* ---------------- trend chart ---------------- */
+(function(){
+  const svg=document.getElementById('trendChart');
+  const pts=[58,62,60,67,71,74,78,81];
+  const W=600,H=200,pad=12;
+  const max=90,min=50;
+  const xs=i=>pad+i*(W-2*pad)/(pts.length-1);
+  const ys=v=>H-pad-(v-min)/(max-min)*(H-2*pad);
+  let d='',area='';
+  pts.forEach((v,i)=>{d+=(i?'L':'M')+xs(i)+' '+ys(v)+' ';});
+  area=d+`L${xs(pts.length-1)} ${H} L${xs(0)} ${H} Z`;
+  svg.innerHTML=`<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#cdf564" stop-opacity=".3"/><stop offset="1" stop-color="#cdf564" stop-opacity="0"/></linearGradient></defs>
+    <path d="${area}" fill="url(#g)"/><path d="${d}" fill="none" stroke="#cdf564" stroke-width="2.5"/>
+    ${pts.map((v,i)=>`<circle cx="${xs(i)}" cy="${ys(v)}" r="${i===pts.length-1?5:3}" fill="${i===pts.length-1?'#cdf564':'#0c0d10'}" stroke="#cdf564" stroke-width="2"/>`).join('')}`;
+})();
+
+/* ---------------- sample designs (inline SVG) ---------------- */
+function svgURI(s){return 'data:image/svg+xml,'+encodeURIComponent(s);}
+const sampleLanding=svgURI(`<svg xmlns='http://www.w3.org/2000/svg' width='800' height='520'><rect width='800' height='520' fill='#0e1622'/><rect width='800' height='64' fill='#13202f'/><circle cx='40' cy='32' r='12' fill='#3b82f6'/><rect x='620' y='20' width='150' height='26' rx='13' fill='#3b82f6'/><text x='200' y='220' fill='#e8eef7' font-family='Arial' font-size='52' font-weight='bold'>Build faster</text><text x='200' y='270' fill='#8aa0bd' font-family='Arial' font-size='20'>The platform for modern teams</text><rect x='200' y='310' width='180' height='54' rx='10' fill='#2563eb'/><rect x='400' y='310' width='150' height='54' rx='10' fill='#1c2a3a' stroke='#2f4256'/><rect x='560' y='120' width='200' height='320' rx='14' fill='#13202f' stroke='#22344a'/></svg>`);
+const sampleMobile=svgURI(`<svg xmlns='http://www.w3.org/2000/svg' width='360' height='760'><rect width='360' height='760' fill='#faf7f2'/><rect width='360' height='90' fill='#ffffff'/><circle cx='40' cy='45' r='16' fill='#ff7a59'/><text x='70' y='52' fill='#1c1c1c' font-family='Arial' font-size='20' font-weight='bold'>Fitly</text><rect x='24' y='120' width='312' height='180' rx='18' fill='#ff7a59'/><text x='44' y='180' fill='#fff' font-family='Arial' font-size='26' font-weight='bold'>Today's goal</text><text x='44' y='220' fill='#ffe3d8' font-family='Arial' font-size='15'>6,240 / 10,000 steps</text><rect x='24' y='330' width='148' height='148' rx='16' fill='#fff' stroke='#eee'/><rect x='188' y='330' width='148' height='148' rx='16' fill='#fff' stroke='#eee'/><rect x='0' y='690' width='360' height='70' fill='#fff'/><circle cx='60' cy='725' r='8' fill='#ff7a59'/><circle cx='180' cy='725' r='8' fill='#ccc'/><circle cx='300' cy='725' r='8' fill='#ccc'/></svg>`);
+const sampleDash=svgURI(`<svg xmlns='http://www.w3.org/2000/svg' width='800' height='520'><rect width='800' height='520' fill='#f4f6fb'/><rect width='210' height='520' fill='#16182b'/><rect x='28' y='30' width='120' height='14' rx='7' fill='#6c5ce7'/><rect x='28' y='90' width='150' height='10' rx='5' fill='#3a3d55'/><rect x='28' y='120' width='150' height='10' rx='5' fill='#2a2d42'/><rect x='250' y='40' width='160' height='90' rx='14' fill='#fff'/><rect x='430' y='40' width='160' height='90' rx='14' fill='#fff'/><rect x='610' y='40' width='160' height='90' rx='14' fill='#6c5ce7'/><rect x='250' y='160' width='520' height='300' rx='14' fill='#fff'/><polyline points='280,400 360,340 440,370 520,300 600,330 680,260 740,290' fill='none' stroke='#6c5ce7' stroke-width='3'/></svg>`);
+const samples=[{name:'Landing page',uri:sampleLanding},{name:'Mobile app',uri:sampleMobile},{name:'Dashboard',uri:sampleDash}];
+const sampWrap=document.getElementById('samples');
+samples.forEach(s=>{const d=document.createElement('div');d.className='s';
+  d.innerHTML=`<div class="pv" style="background:url('${s.uri}') center/cover"></div><small>${s.name}</small>`;
+  d.onclick=()=>loadImage(s.uri);sampWrap.appendChild(d);});
+
+/* ---------------- upload handling ---------------- */
+const drop=document.getElementById('drop'),fileInput=document.getElementById('fileInput');
+drop.onclick=()=>fileInput.click();
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileInput.click();}});
+function handleFile(f){
+  if(!f){return;}
+  const isImg=(f.type&&f.type.indexOf('image')===0)||/\.(png|jpe?g|webp|gif|svg)$/i.test(f.name||'');
+  if(!isImg){toast('Please choose an image file (PNG, JPG, WEBP)');return;}
+  const r=new FileReader();
+  r.onload=()=>loadImage(r.result);              // data URL — works inside the sandbox
+  r.onerror=()=>toast('Could not read that file');
+  r.readAsDataURL(f);
+}
+fileInput.onchange=e=>handleFile(e.target.files&&e.target.files[0]);
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
+drop.addEventListener('drop',e=>{e.preventDefault();handleFile(e.dataTransfer.files&&e.dataTransfer.files[0]);});
+
+function loadImage(src){
+  const img=new Image();
+  img.onload=()=>runAnalysis(img,src);
+  img.onerror=()=>toast('Could not load image');
+  img.src=src;
+}
+
+/* ---------------- REAL color extraction ---------------- */
+function extractPalette(img,k=6){
+  const c=document.createElement('canvas');
+  const w=c.width=90,h=c.height=Math.max(1,Math.round(90*img.height/img.width));
+  const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);
+  let data;try{data=ctx.getImageData(0,0,w,h).data;}catch(e){return [];}
+  const map={};
+  for(let i=0;i<data.length;i+=4){
+    if(data[i+3]<120)continue;
+    const r=Math.round(data[i]/28)*28,g=Math.round(data[i+1]/28)*28,b=Math.round(data[i+2]/28)*28;
+    const key=r+','+g+','+b;map[key]=(map[key]||0)+1;
+  }
+  let sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]).map(e=>e[0].split(',').map(Number));
+  const out=[];
+  for(const col of sorted){
+    if(out.length>=k)break;
+    if(out.every(o=>Math.abs(o[0]-col[0])+Math.abs(o[1]-col[1])+Math.abs(o[2]-col[2])>60))out.push(col);
+  }
+  return out;
+}
+const hex=c=>'#'+c.map(v=>Math.min(255,Math.max(0,v)).toString(16).padStart(2,'0')).join('');
+function lum(c){const a=c.map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);});return .2126*a[0]+.7152*a[1]+.0722*a[2];}
+function contrast(c1,c2){const l1=lum(c1),l2=lum(c2);return ((Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05));}
+
+/* ---------------- analysis run ---------------- */
+const heuristics=['Visibility of system status','Match with the real world','User control & freedom','Consistency & standards','Error prevention','Recognition over recall','Flexibility & efficiency','Aesthetic & minimalist design','Error recovery support','Help & documentation'];
+const progSteps=['Mapping interface elements (Vision AI)','Checking WCAG contrast & sizing','Scoring Nielsen heuristics','Evaluating visual hierarchy','Generating design critique','Extracting design system'];
+let lastReport=null;
+
+function runAnalysis(img,src){
+  document.getElementById('uploadPanel').style.display='none';
+  document.getElementById('results').classList.remove('on');
+  const an=document.getElementById('analyzing');an.classList.add('on');
+  const pl=document.getElementById('progList');
+  pl.innerHTML=progSteps.map((s,i)=>`<div class="pstep" id="ps${i}"><span class="chk">✓</span>${s}</div>`).join('');
+  let i=0;const tick=()=>{if(i<progSteps.length){document.getElementById('ps'+i).classList.add('done');i++;setTimeout(tick,520);}else{setTimeout(()=>{an.classList.remove('on');renderResults(img,src);},450);}};
+  setTimeout(tick,400);
+}
+
+// deterministic-ish pseudo score seeded by image signature
+function seedFrom(palette){let s=0;palette.forEach(c=>s+=c[0]*3+c[1]*5+c[2]*7);return s;}
+function rng(seed){return ()=>{seed=(seed*9301+49297)%233280;return seed/233280;};}
+
+function renderResults(img,src){
+  document.getElementById('uploadPanel').style.display='none';
+  document.getElementById('analyzing').classList.remove('on');
+  let palette=extractPalette(img,6);
+  if(!palette.length){palette=[[18,19,23],[205,245,100],[255,106,69],[245,242,234],[122,140,255],[154,152,142]];}
+  const seed=seedFrom(palette)||500;const rand=rng(seed);
+  const ratio=img.width/img.height;
+  const device=ratio<0.7?'Mobile':ratio>1.5?'Desktop / Web':'Tablet / Square';
+
+  // real-ish accessibility: contrast of palette vs white & black
+  let failW=0,failB=0;
+  palette.forEach(c=>{if(contrast(c,[255,255,255])<4.5)failW++;if(contrast(c,[0,0,0])<4.5)failB++;});
+  const bestText=failW<=failB?'white text':'dark text';
+  const passRate=palette.length?1-(Math.min(failW,failB)/palette.length):0.7;
+  const acc=Math.round(48+passRate*44);
+
+  const hier=Math.round(68+rand()*26);
+  const heurScores=heuristics.map(h=>({h,v:Math.round(60+rand()*36)}));
+  const heurAvg=Math.round(heurScores.reduce((a,b)=>a+b.v,0)/heurScores.length);
+  const ux=Math.round((acc*0.3+hier*0.3+heurAvg*0.4));
+
+  // critiques — derived from THIS design's metrics + seeded variety
+  const nFail=Math.min(failW,failB);
+  const sevRank={high:0,med:1,low:2};
+  function pickN(arr,n){const a=arr.slice();for(let k=a.length-1;k>0;k--){const j=Math.floor(rand()*(k+1));const t=a[k];a[k]=a[j];a[j]=t;}return a.slice(0,n);}
+  const driven=[];
+  if(acc<80)driven.push({s:acc<65?'high':'med',t:'Color contrast falls short of WCAG AA',imp:`${nFail} of ${palette.length} key tones drop below the 4.5:1 ratio for text.`,rec:`Use ${bestText} for body copy and keep low contrast tones off text.`});
+  driven.push({s:ux<78?'high':'med',t:'Primary CTA does not stand out enough',imp:'A low emphasis main action reduces clicks and conversion.',rec:'Make the CTA the highest contrast element and increase its size and padding.'});
+  if(hier<82)driven.push({s:hier<70?'high':'med',t:'Visual hierarchy is competing for attention',imp:'Several elements share equal weight, so the eye has no clear path.',rec:'Choose one focal point per screen and demote the rest with size and spacing.'});
+  if(heurAvg<80)driven.push({s:'med',t:'Feedback and states are inconsistent',imp:'Users may be unsure whether an action succeeded.',rec:'Add clear hover, active, loading and error states to interactive elements.'});
+  driven.push(device==='Mobile'?{s:'med',t:'Touch targets near the minimum size',imp:'Small targets cause mistaps on phones.',rec:'Ensure tappable elements are at least 44 by 44 px.'}:{s:'low',t:'Dense content blocks could breathe more',imp:'Tight sections raise cognitive load.',rec:'Group related content and add whitespace between unrelated groups.'});
+  const critExtra=[
+    {s:'low',t:'Spacing rhythm is uneven',imp:'Irregular gaps subtly lower perceived polish.',rec:'Adopt an 8px spacing scale across sections and components.'},
+    {s:'med',t:'Navigation lacks clear prioritization',imp:'Equal weight nav items hide the primary path.',rec:'Emphasize the main destination and group secondary links.'},
+    {s:'low',t:'Typography scale is a little flat',imp:'Similar text sizes weaken hierarchy.',rec:'Use a stronger modular scale to separate headings from body.'},
+    {s:'med',t:'The form asks for more than it needs',imp:'Extra fields increase drop off.',rec:'Reduce the form to essential fields and defer the rest.'}
+  ];
+  const allCrit=driven.concat(pickN(critExtra,2)).sort((a,b)=>sevRank[a.s]-sevRank[b.s]).slice(0,5);
+
+  const ringHTML=(v,l)=>`<div class="scard"><div class="ring" style="--v:${v}"><span>${v}</span></div><h4>${l}</h4></div>`;
+
+  const fontGuess=device==='Mobile'?['SF Pro / Inter','Sans serif system','16px base, 1.5 line height']:['Geometric sans display','Humanist sans body','17px base, 1.6 line height'];
+
+  // ---- Feature 7: multi-agent findings (derived from real signals) ----
+  const agents=[
+    {n:'UX Research Agent',ic:'◍',f:[`Primary flow shows ${heurAvg<75?'notable':'minor'} friction at the decision step.`,'Reduce choices on the entry screen to speed the first action.']},
+    {n:'Accessibility Agent',ic:'⊹',f:[`${nFail} palette tone${nFail===1?'':'s'} fall ${acc<70?'well below':'near'} WCAG AA against text.`,`Default body copy to ${bestText} for a safe contrast baseline.`]},
+    {n:'Visual Design Agent',ic:'▤',f:[`Hierarchy ${hier}/100 — focal point ${hier<80?'needs strengthening':'reads clearly'}.`,`${palette.length} tones detected; tighten to 3 core plus neutrals.`]},
+    {n:'Product Strategy Agent',ic:'✦',f:[`Conversion risk ${ux<80?'elevated':'low'} given current CTA weight.`,'A/B test a single high contrast primary action.']},
+    {n:'Design System Agent',ic:'⬡',f:[`Extracted ${palette.length} colors and an 8px spacing base into tokens.`,'Promote repeated card and button styles into components.']}
+  ];
+  const coordSummary=`Overall UX ${ux}/100. The Accessibility and Visual Design agents flag the highest priority fixes; Product Strategy estimates a meaningful conversion lift from a stronger primary CTA and tighter hierarchy. Recommended first step: apply the ${bestText} contrast fix, then re-test.`;
+
+  // ---- Features 2 & 8: design to requirements ----
+  const components=device==='Mobile'?['Top app bar','Hero / featured card','Content cards','Bottom tab bar','Primary CTA','Form inputs']:device==='Desktop / Web'?['Navbar','Hero section','Feature grid','Pricing cards','Footer','Primary CTA','Forms']:['Header','Card grid','Sidebar','Primary CTA','Forms'];
+  const reqs=['User authentication and profiles','Search and filtering','Notifications system','Analytics dashboard','Role based access control'];
+  const stories=['As a user, I want to search and filter results quickly.','As a user, I want clear feedback when an action succeeds or fails.','As an admin, I want to manage users and permissions.','As a visitor, I want one obvious primary action on every screen.'];
+  const stack={Frontend:'Next.js + TypeScript + Tailwind',Backend:'FastAPI services',Database:'PostgreSQL + Supabase',AI:'Groq (Llama 3.3 70B) + RAG'};
+
+  // ---- Feature 6: before / after redesign ----
+  const before=['Low contrast primary CTA','Competing focal points','Dense content blocks','Inconsistent spacing'];
+  const after=[`High contrast ${bestText} CTA, enlarged`,'Single clear focal point per screen','Generous whitespace and grouping','Consistent 8px spacing rhythm'];
+
+  lastReport={ux,acc,hier,heurAvg,device,palette,bestText,crit:allCrit,dims:img.width+'×'+img.height};
+
+  document.getElementById('results').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:6px">
+      <div><span class="pill"><span class="dot"></span>Analysis complete</span></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" onclick="exportJSON()">⬇ Export tokens</button>
+        <button class="btn btn-ghost" onclick="toast('Report queued, PDF/CSV export wired in the backend')">⬇ PDF report</button>
+        <button class="btn btn-primary" onclick="resetAnalyze()">+ Analyze another</button>
+      </div>
+    </div>
+    <div class="res-grid">
+      <div>
+        <div class="panel">
+          <img class="preview-img" src="${src}" alt="uploaded design">
+          <div class="imeta">
+            <span class="tag">Device · <b>${device}</b></span>
+            <span class="tag">Size · <b>${img.width}×${img.height}</b></span>
+            <span class="tag">Best text · <b>${bestText}</b></span>
+          </div>
+          <div style="margin-top:20px;text-align:center">
+            <div style="font-size:13px;color:var(--txt-dim)">Overall UX score</div>
+            <div class="scorebig" style="font-size:64px;margin-top:4px">${ux}<span style="font-size:24px;color:var(--txt-dim)">/100</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="scorecards">${ringHTML(acc,'Accessibility')}${ringHTML(hier,'Visual hierarchy')}${ringHTML(heurAvg,'Heuristics')}</div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="crit">Critique</button>
+          <button class="tab" data-tab="agents">Agents</button>
+          <button class="tab" data-tab="heur">Heuristics</button>
+          <button class="tab" data-tab="color">Color</button>
+          <button class="tab" data-tab="type">Typography</button>
+          <button class="tab" data-tab="spec">Build spec</button>
+          <button class="tab" data-tab="redesign">Redesign</button>
+          <button class="tab" data-tab="tok">Tokens</button>
+        </div>
+
+        <div class="tabpane on" id="tab-crit">
+          <div class="critlist">${allCrit.map(c=>`
+            <div class="citem"><div class="sev ${c.s}"></div><div class="ctxt"><b>${c.t}</b>
+              <div class="row"><span>Impact</span><span>${c.imp}</span></div>
+              <div class="row"><span>Fix</span><span>${c.rec}</span></div></div></div>`).join('')}</div>
+        </div>
+
+        <div class="tabpane" id="tab-heur">
+          <div class="heur">${heurScores.map(s=>`<div class="hcell"><div class="hh"><b>${s.h}</b><span class="sc">${s.v}</span></div><div class="bar"><i style="width:${s.v}%"></i></div></div>`).join('')}</div>
+        </div>
+
+        <div class="tabpane" id="tab-color">
+          <p style="color:var(--txt-dim);font-size:13.5px;margin-bottom:6px">Extracted from your image, click a swatch to copy.</p>
+          <div class="palette">${palette.map(c=>{const h=hex(c);const txt=contrast(c,[255,255,255])>contrast(c,[0,0,0])?'#fff':'#000';
+            return `<div class="sw" style="background:${h};color:${txt}" onclick="copy('${h}');toast('Copied ${h}')">${h}</div>`;}).join('')}</div>
+        </div>
+
+        <div class="tabpane" id="tab-type">
+          <div class="typo">
+            <div class="t"><div class="ex" style="font-family:var(--serif)">Display heading</div><small>${fontGuess[0]} · scale 1.333 (perfect fourth)</small></div>
+            <div class="t"><div class="ex" style="font-size:18px">Body copy reads comfortably at this size and rhythm.</div><small>${fontGuess[1]} · ${fontGuess[2]}</small></div>
+            <div class="t"><div class="ex" style="font-family:var(--mono);font-size:15px">label / caption / mono</div><small>Recommended pairing for data & labels</small></div>
+          </div>
+        </div>
+
+        <div class="tabpane" id="tab-agents">
+          <p style="color:var(--txt-dim);font-size:13px;margin-bottom:12px">Five specialist agents reviewed your design in parallel; the coordinator fused their findings.</p>
+          ${agents.map(a=>`<div class="agentcard"><div class="ah"><span class="ai">${a.ic}</span><div><b>${a.n}</b></div><span class="st">done</span></div><ul>${a.f.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
+          <div class="coord"><b>✦ Coordinator — executive summary</b><p>${coordSummary}</p></div>
+        </div>
+
+        <div class="tabpane" id="tab-spec">
+          <p style="color:var(--txt-dim);font-size:13px;margin-bottom:12px">Design converted into a starter product spec.</p>
+          <div class="specgrid">
+            <div class="blk"><h5>Detected components</h5><ul>${components.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+            <div class="blk"><h5>Functional requirements</h5><ul>${reqs.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+            <div class="blk"><h5>User stories</h5><ul>${stories.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+            <div class="blk"><h5>Suggested stack</h5><ul>${Object.entries(stack).map(([k,v])=>`<li><b style="color:var(--txt)">${k}:</b> ${v}</li>`).join('')}</ul></div>
+          </div>
+        </div>
+
+        <div class="tabpane" id="tab-redesign">
+          <p style="color:var(--txt-dim);font-size:13px;margin-bottom:12px">Each change targets a measured weakness from the analysis above.</p>
+          <div class="ba">
+            <div class="col"><h5>Current</h5><ul>${before.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+            <div class="col after"><h5>Suggested</h5><ul>${after.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+          </div>
+          <div class="coord" style="margin-top:14px"><b>Why this works</b><p>Lifting CTA contrast raises the accessibility score, a single focal point improves task success, and a consistent spacing rhythm raises perceived quality — the three highest leverage moves for this screen.</p></div>
+        </div>
+
+        <div class="tabpane" id="tab-tok">
+          <pre class="tokens">{
+  <span class="k">"color"</span>: {
+${palette.map((c,i)=>`    <span class="k">"${i===0?'primary':i===1?'secondary':i===2?'accent':'neutral'+(i-2)}"</span>: <span class="s">"${hex(c)}"</span>`).join(',\n')}
+  },
+  <span class="k">"typography"</span>: { <span class="k">"baseSize"</span>: <span class="s">"16px"</span>, <span class="k">"scale"</span>: <span class="s">"1.333"</span> },
+  <span class="k">"spacing"</span>: { <span class="k">"base"</span>: <span class="s">"8px"</span> },
+  <span class="k">"scores"</span>: { <span class="k">"ux"</span>: ${ux}, <span class="k">"a11y"</span>: ${acc}, <span class="k">"hierarchy"</span>: ${hier} }
+}</pre>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('results').classList.add('on');
+  document.querySelectorAll('#results .tab').forEach(t=>t.onclick=()=>{
+    document.querySelectorAll('#results .tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('#results .tabpane').forEach(x=>x.classList.remove('on'));
+    t.classList.add('active');document.getElementById('tab-'+t.dataset.tab).classList.add('on');
+  });
+  window.scrollTo(0,0);
+}
+function resetAnalyze(){
+  document.getElementById('results').classList.remove('on');
+  document.getElementById('analyzing').classList.remove('on');
+  document.getElementById('uploadPanel').style.display='block';
+  document.getElementById('fileInput').value='';
+  window.scrollTo(0,0);
+}
+function exportJSON(){
+  if(!lastReport){toast('Run an analysis first');return;}
+  const tokens={color:{},typography:{baseSize:'16px',scale:'1.333'},spacing:{base:'8px'},scores:{ux:lastReport.ux,a11y:lastReport.acc,hierarchy:lastReport.hier}};
+  lastReport.palette.forEach((c,i)=>tokens.color[i===0?'primary':i===1?'secondary':i===2?'accent':'neutral'+(i-2)]=hex(c));
+  const json=JSON.stringify(tokens,null,2);
+  copy(json);
+  let downloaded=false;
+  try{const blob=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='design_tokens.json';document.body.appendChild(a);a.click();a.remove();downloaded=true;}catch(e){}
+  toast(downloaded?'Tokens copied & download started':'Tokens copied to clipboard');
+}
+
+/* ---------------- recent / reports lists ---------------- */
+const recents=[
+  {n:'Checkout flow v3',d:'2h ago',sc:82,u:sampleLanding},
+  {n:'Fitly mobile home',d:'Yesterday',sc:76,u:sampleMobile},
+  {n:'Analytics dashboard',d:'2 days ago',sc:88,u:sampleDash},
+  {n:'Pricing page',d:'4 days ago',sc:71,u:sampleLanding}
+];
+function rowHTML(r){return `<div class="rrow" onclick="go('analyze')"><div class="thumb" style="background-image:url('${r.u}')"></div><div class="meta"><b>${r.n}</b><small>${r.d}</small></div><div class="sc" style="color:${r.sc>=85?'var(--good)':r.sc>=75?'var(--accent)':'var(--warn)'}">${r.sc}</div></div>`;}
+document.getElementById('recentList').innerHTML=recents.map(rowHTML).join('');
+document.getElementById('reportsList').innerHTML=recents.map(r=>`<div class="rrow"><div class="thumb" style="background-image:url('${r.u}')"></div><div class="meta"><b>${r.n} · UX Audit</b><small>${r.d} · PDF · CSV</small></div><button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="toast('Export wired in backend')">⬇</button></div>`).join('');
+
+/* ---------------- palette studio ---------------- */
+const industries={
+  Fintech:{c:['#0b1f3a','#1d4ed8','#22d3a7','#f8fafc'],d:'Trust forward navy base with a confident blue primary and a fresh mint accent for growth metrics.'},
+  Healthcare:{c:['#0f3d3e','#14b8a6','#7dd3fc','#f0fdf9'],d:'Calm teal and soft sky tones convey care, cleanliness and reassurance.'},
+  Ecommerce:{c:['#1c1917','#f97316','#fb7185','#fff7ed'],d:'High energy orange and coral drive urgency and add to cart momentum.'},
+  Luxury:{c:['#0c0a09','#c8a04e','#e7e5e4','#fafaf9'],d:'Near black canvas with brushed gold restraint: quiet, premium confidence.'},
+  Beauty:{c:['#2d1b2e','#e879a6','#fbcfe8','#fff1f7'],d:'Romantic rose and plum palette with soft, inviting backgrounds.'},
+  Education:{c:['#172554','#6366f1','#fcd34d','#eef2ff'],d:'Friendly indigo with a warm yellow accent, approachable and focused.'}
+};
+const ib=document.getElementById('industryBtns');
+Object.keys(industries).forEach((k,i)=>{const b=document.createElement('button');b.className='btn '+(i===0?'btn-primary':'btn-ghost');b.style.padding='9px 16px';b.style.fontSize='13.5px';b.textContent=k;
+  b.onclick=()=>{ib.querySelectorAll('button').forEach(x=>{x.className='btn btn-ghost';x.style.padding='9px 16px';x.style.fontSize='13.5px';});b.className='btn btn-primary';b.style.padding='9px 16px';b.style.fontSize='13.5px';showPalette(k);};
+  ib.appendChild(b);});
+function showPalette(k){
+  const labels=['Background','Primary','Accent','Surface'];
+  document.getElementById('genPalette').innerHTML=industries[k].c.map((c,i)=>{const rgb=c.match(/\w\w/g).map(x=>parseInt(x,16));const txt=contrast(rgb,[255,255,255])>contrast(rgb,[0,0,0])?'#fff':'#000';
+    return `<div class="sw" style="background:${c};color:${txt}" onclick="copy('${c}');toast('Copied ${c}')"><div>${labels[i]}<br>${c}</div></div>`;}).join('');
+  document.getElementById('paletteDesc').textContent=industries[k].d;
+}
+showPalette('Fintech');
+
+/* ---------------- AI Mentor chatbot (simulated senior consultant) ---------------- */
+const mentorIntents=[
+  {k:['cta','call to action','button'],a:"A weak CTA almost always comes down to contrast, size, and isolation. Make the primary action the highest contrast element on screen, give it generous padding, and surround it with whitespace so nothing competes. One primary action per view; everything else secondary or ghost."},
+  {k:['accessib','wcag','contrast'],a:"Start with contrast: body text needs at least 4.5:1 against its background (3:1 for large text). Then check tap targets (44x44px minimum), visible keyboard focus states, and never rely on color alone to carry meaning. Run a design through Analyze and I'll point to the exact tones that fail."},
+  {k:['conversion','convert','sales','signup','sign up'],a:"Conversion is mostly friction removal. Cut form fields to the essential minimum, put the value proposition above the fold, give one unmistakable primary CTA, and reassure right at the point of action with security or social proof. Measure the funnel before redesigning everything."},
+  {k:['hierarchy','layout','structure'],a:"Visual hierarchy guides the eye in order of importance using size, weight, color, and spacing. The most common fix: choose one focal point per screen, demote everything else, and use whitespace to group related items."},
+  {k:['spacing','whitespace','padding'],a:"Adopt a consistent spacing scale; an 8px base works well (8, 16, 24, 32...). Inconsistent gaps read as unpolished even when users can't say why. Group related elements tightly and separate unrelated ones generously."},
+  {k:['color','palette','theme'],a:"Stay disciplined: one dominant brand color, one accent reserved strictly for actions, and a neutral range for surfaces and text. Check every text and background pair for contrast, and don't let the accent leak onto non actions or it loses meaning."},
+  {k:['typograph','font','type'],a:"Pair one characterful display face with one clean, readable body face. Use a modular scale (1.25 or 1.333 ratio), keep body text 16px or larger, and set line height around 1.5 for comfortable reading."},
+  {k:['mobile','responsive','phone'],a:"Design mobile first: single column, primary actions within thumb reach near the bottom, tap targets 44px or larger, and avoid hover only interactions. Test your smallest supported viewport before the largest."},
+  {k:['portfolio','recruiter','job','case study','hire'],a:"Recruiters skim. Lead each case study with the problem, your role, and the outcome, ideally a metric. Keep the process tight and make impact obvious in the first few seconds. Try Portfolio Lab here for a simulated recruiter review."}
+];
+function mentorReply(q){const t=q.toLowerCase();for(const it of mentorIntents){if(it.k.some(k=>t.includes(k)))return it.a;}return "Good question. Tell me what you're working on (landing page, dashboard, mobile screen, form...) and the outcome you care about (clarity, conversion, accessibility), and I'll give you specific, prioritized fixes. You can also run a screenshot through Analyze Design and I'll reference the results.";}
+const chatLog=document.getElementById('chatLog');
+function addMsg(text,who){const d=document.createElement('div');d.className='msg '+who;d.textContent=text;chatLog.appendChild(d);chatLog.scrollTop=chatLog.scrollHeight;return d;}
+function mentorSend(q){if(!q||!q.trim())return;addMsg(q,'user');const typing=addMsg('thinking…','bot typing');setTimeout(()=>{typing.remove();addMsg(mentorReply(q),'bot');},650);}
+document.getElementById('chatChips').innerHTML=['Improve my landing page CTA','How do I boost conversion?','Make this accessible','Tips for my portfolio'].map(c=>`<button class="chip">${c}</button>`).join('');
+document.querySelectorAll('#chatChips .chip').forEach(b=>b.onclick=()=>mentorSend(b.textContent));
+document.getElementById('chatSend').onclick=()=>{const i=document.getElementById('chatInput');mentorSend(i.value);i.value='';};
+document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){mentorSend(e.target.value);e.target.value='';}});
+addMsg("Hi, I'm your AI design mentor. Ask me anything about UX, accessibility, conversion, or your portfolio. What are you working on?",'bot');
+
+/* ---------------- Portfolio Lab (simulated recruiter review) ---------------- */
+function pfRun(){
+  const url=(document.getElementById('pfUrl').value||'your portfolio').trim();
+  let seed=0;for(const ch of url)seed+=ch.charCodeAt(0);
+  const rand=rng(seed||7);
+  // seeded picker: different input -> different seed -> different selections
+  function pick(arr,n){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));const t=a[i];a[i]=a[j];a[j]=t;}return a.slice(0,Math.max(1,Math.min(n,a.length)));}
+  const pScore=Math.round(68+rand()*26),rScore=Math.round(62+rand()*30);
+
+  const departments=[
+    {p:'AI / ML Engineering',ic:'⚙',
+      like:['Clear technical projects with measurable outcomes','Evidence of shipping real, working products','Comfort with data pipelines and model workflows','Hands on with modern AI tooling'],
+      concern:['Some projects read design only with little system detail','Limited detail on scale, latency or evaluation','Few links to runnable code'],
+      miss:['Architecture notes or links to live demos and repos','Metrics on model or system performance','A write up of one hard technical tradeoff']},
+    {p:'Data & Analytics',ic:'▦',
+      like:['Strong quantitative framing of problems','Comfort turning data into decisions','Clear metrics and measurable results','Good storytelling around numbers'],
+      concern:['Some claims lack a baseline or comparison','Metrics shown without how they were measured','The analysis to action link could be tighter'],
+      miss:['The business question behind each metric','Dashboards or analysis artifacts','A clear before and after on a key metric']},
+    {p:'Product Design',ic:'◆',
+      like:['Strong problem framing and a visible process','Good range across product surfaces','Polished, consistent visual craft','Clear rationale behind design decisions'],
+      concern:['Outcomes not always tied to business value','A few screens feel templated','Process shown but impact understated'],
+      miss:['One flagship case study with before and after impact','Evidence of cross functional collaboration','Explorations or alternatives you rejected']},
+    {p:'UX Research',ic:'✸',
+      like:['Visible research and usability thinking','Thoughtful interaction details','Evidence of testing with real users','Clear synthesis from findings to decisions'],
+      concern:['Case studies run long; lead with the punchline','Methods named but not actually shown','Insights stated without supporting evidence'],
+      miss:['Accessibility considerations called out explicitly','Sample size or method notes for studies','How findings changed the final design']},
+    {p:'Product Management',ic:'◎',
+      like:['Clear sense of user and business value','Prioritization and tradeoff thinking','Outcome oriented, not just output','Strong narrative from problem to result'],
+      concern:['Success metrics not always defined upfront','Scope decisions under explained','User value clear, business value less so'],
+      miss:['Goals and success metrics per project','Evidence of working with engineering','A roadmap or prioritization rationale']},
+    {p:'Frontend Engineering',ic:'⬡',
+      like:['Designs that map cleanly to components','Awareness of responsive behavior','Attention to states and edge cases','Reuse and consistency across screens'],
+      concern:['Handoffs and specs not shown','Unclear how designs translate to code','Few notes on performance or feasibility'],
+      miss:['Component or design token thinking','Responsive plus empty and error states','Notes on implementation feasibility']},
+    {p:'Recruiting / Talent screen',ic:'★',
+      like:['Easy to skim in under a minute','Clear role and contribution per project','Professional, recruiter friendly layout','A strong, specific headline'],
+      concern:['Some pages take effort to scan quickly','Role on team projects is ambiguous','Contact or links not immediately obvious'],
+      miss:['A one line impact summary per project','Clear current role and target role','Resume and contact links up front']}
+  ];
+
+  const improvePool=['Open each case study with problem, role, and outcome in one line','Add at least one quantified result per project','Call out accessibility decisions explicitly','Trim each case study to a 30 second skim plus optional depth','Make your current role and target role obvious up front','Add links to live demos or repos where possible','Show one hard tradeoff and how you decided','Tie each project to a business or user metric','Add a short note on process, not only final screens','Lead with impact and move detailed process below the fold'];
+  const improves=pick(improvePool,5);
+
+  const ring=(v,l)=>`<div class="scard"><div class="ring" style="--v:${v}"><span>${v}</span></div><h4>${l}</h4></div>`;
+  const personaHTML=departments.map(x=>{
+    const fit=Math.round(58+rand()*40);
+    const likes=pick(x.like,2),concerns=pick(x.concern,1+Math.round(rand())),misses=pick(x.miss,1+Math.round(rand()));
+    return `<div class="persona"><div class="ph2"><span class="pi">${x.ic}</span><b>${x.p}</b><span class="fit">fit ${fit}</span></div>
+      <div class="pcols"><div class="like"><h6>Will like</h6><ul>${likes.map(i=>`<li>${i}</li>`).join('')}</ul></div>
+      <div class="concern"><h6>May question</h6><ul>${concerns.map(i=>`<li>${i}</li>`).join('')}</ul></div>
+      <div class="miss"><h6>Missing</h6><ul>${misses.map(i=>`<li>${i}</li>`).join('')}</ul></div></div></div>`;}).join('');
+
+  document.getElementById('portfolioResults').innerHTML=`
+    <div class="panel" style="margin-top:16px">
+      <div class="ph"><div><h3>Review for ${url}</h3><small>Simulated across ${departments.length} department lenses</small></div>
+        <button class="btn btn-ghost" onclick="document.getElementById('portfolioResults').innerHTML=''">↺ Reset</button></div>
+      <div class="scorecards" style="margin-bottom:18px">${ring(pScore,'Portfolio score')}${ring(rScore,'Recruiter readiness')}${ring(Math.round((pScore+rScore)/2),'Overall')}</div>
+      ${personaHTML}
+      <div class="coord"><b>Top improvements</b><ul style="list-style:none;margin-top:10px;display:flex;flex-direction:column;gap:8px">${improves.map(i=>`<li style="font-size:13.5px;color:var(--txt-dim);padding-left:16px;position:relative"><span style="position:absolute;left:0;color:var(--accent)">›</span>${i}</li>`).join('')}</ul></div>
+    </div>`;
+}
+document.getElementById('pfRun').onclick=pfRun;
+document.getElementById('pfUrl').addEventListener('keydown',e=>{if(e.key==='Enter')pfRun();});
+
+/* ---------------- scroll reveal (landing, progressive enhancement) ---------------- */
+(function(){
+  if(!('IntersectionObserver' in window))return;
+  const els=document.querySelectorAll('#view-landing .card, #view-landing .step, #view-landing .price, #view-landing .sec-head, #view-landing .qa');
+  els.forEach((el,i)=>{el.classList.add('io');el.style.transitionDelay=((i%4)*60)+'ms';});
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.12});
+  els.forEach(el=>io.observe(el));
+})();
+</script>
+</body>
+</html>
