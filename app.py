@@ -24,9 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-# ---------------------------------------------------------------------------
 # Lifespan — optional RAG store loaded once at startup if ./chroma_lumen exists
-# ---------------------------------------------------------------------------
+
 _rag_store: Any = None
 
 @asynccontextmanager
@@ -43,9 +42,7 @@ async def lifespan(app: FastAPI):
     _rag_store = None
 
 
-# ---------------------------------------------------------------------------
 # App
-# ---------------------------------------------------------------------------
 app = FastAPI(
     title="Lumen AI Design API",
     description="Multi-agent UX analysis, AI design mentor, and portfolio review.",
@@ -65,9 +62,8 @@ DEFAULT_PALETTE = [(18, 19, 23), (205, 245, 100), (255, 106, 69), (245, 242, 234
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-# ---------------------------------------------------------------------------
 # Frontend
-# ---------------------------------------------------------------------------
+
 @app.get("/", response_class=FileResponse)
 async def serve_frontend():
     """Serve the single-page frontend."""
@@ -77,9 +73,8 @@ async def serve_frontend():
     return FileResponse(path, media_type="text/html")
 
 
-# ---------------------------------------------------------------------------
 # Health check
-# ---------------------------------------------------------------------------
+
 @app.get("/health")
 async def health():
     """Quick liveness check — also reports whether the API key is configured."""
@@ -90,9 +85,8 @@ async def health():
     }
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
+
 def _validate_image(file: UploadFile) -> None:
     if file.content_type not in ALLOWED_MIME:
         raise HTTPException(
@@ -110,9 +104,8 @@ async def _save_upload(file: UploadFile) -> str:
     return tmp.name
 
 
-# ---------------------------------------------------------------------------
 # POST /api/analyze  — full multi-agent UX review
-# ---------------------------------------------------------------------------
+
 @app.post("/api/analyze")
 async def analyze(file: UploadFile = File(..., description="Screenshot, wireframe, or mockup")):
     """
@@ -136,9 +129,8 @@ async def analyze(file: UploadFile = File(..., description="Screenshot, wirefram
         os.unlink(tmp_path)
 
 
-# ---------------------------------------------------------------------------
 # POST /api/mentor  — RAG-grounded AI design mentor
-# ---------------------------------------------------------------------------
+
 class MentorRequest(BaseModel):
     question: str
     history: list[dict] = []
@@ -162,9 +154,8 @@ async def mentor(req: MentorRequest):
         raise HTTPException(status_code=500, detail=f"Mentor call failed: {exc}")
 
 
-# ---------------------------------------------------------------------------
 # POST /api/portfolio  — recruiter simulation + portfolio scoring
-# ---------------------------------------------------------------------------
+
 class PortfolioRequest(BaseModel):
     text: str
 
@@ -187,9 +178,7 @@ async def portfolio(req: PortfolioRequest):
         raise HTTPException(status_code=500, detail=f"Portfolio review failed: {exc}")
 
 
-# ---------------------------------------------------------------------------
 # POST /api/requirements  — design image → product spec / PRD
-# ---------------------------------------------------------------------------
 @app.post("/api/requirements")
 async def requirements(file: UploadFile = File(..., description="Design screenshot to convert to a spec")):
     """
@@ -210,10 +199,7 @@ async def requirements(file: UploadFile = File(..., description="Design screensh
     finally:
         os.unlink(tmp_path)
 
-
-# ---------------------------------------------------------------------------
 # Entry point
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     print(f"\nLumen server starting → http://localhost:{port}")
