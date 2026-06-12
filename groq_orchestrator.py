@@ -1,6 +1,5 @@
 """
 Lumen — Agentic AI backend (Groq-only)
-======================================
 A multi-agent system on top of GroqCloud (one provider, OpenAI-compatible).
 Specialized agents analyze a design in parallel; a Coordinator agent fuses their
 findings into one executive report. Also includes the RAG-grounded design mentor
@@ -42,12 +41,11 @@ def _groq():
         _client = _get_client()
     return _client
 
-# ---------------------------------------------------------------------------
 # Model registry — swap freely. Groq rotates its catalog often, so verify IDs
 # against GET https://api.groq.com/openai/v1/models before each deploy.
 # (Note: llama-4-maverick runs at reduced free-tier quota and has been on a
 #  deprecation path — Llama 3.3 70B / GPT-OSS 120B are safer defaults.)
-# --------------------------------------------o-------------------------------
+
 MODELS = {
     "vision":    "meta-llama/llama-4-scout-17b-16e-instruct",  # image input + JSON mode
     "reason":    "llama-3.3-70b-versatile",                    # agents, mentor, specs
@@ -59,9 +57,7 @@ REASON_FALLBACK = "llama-3.1-8b-instant"   # safe fallback: always available on 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"   # local sentence-transformers, no API cost
 
 
-# ===========================================================================
 # Low-level helpers
-# ===========================================================================
 def _data_url(path: str) -> str:
     mime = mimetypes.guess_type(path)[0] or "image/png"
     return f"data:{mime};base64,{base64.b64encode(open(path,'rb').read()).decode()}"
@@ -87,9 +83,8 @@ def chat(content, model: str = None, json_mode: bool = True, temperature: float 
     return json.loads(out) if json_mode else out
 
 
-# ===========================================================================
 # Vision + deterministic accessibility (shared inputs for the agents)
-# ===========================================================================
+
 def map_ui(image_path: str) -> dict:
     prompt = ('Identify UI elements in this screenshot. Return ONLY JSON: '
               '{"device":"mobile|tablet|desktop","elements":[{"type":...,"role":...,'
@@ -117,12 +112,10 @@ def accessibility_check(palette):
             sum(contrast_ratio(c,w) for c in palette) > sum(contrast_ratio(c,b) for c in palette)
             else "dark"}
 
-
-# ===========================================================================
-# SPECIALIZED AGENTS  (Feature 7)
+# SPECIALIZED AGENTS 
 # Each agent is an independent, reusable unit with one responsibility.
 # They all share the same signature: (ui_map, context) -> dict
-# ===========================================================================
+
 def _agent(role_system: str, task: str, ui_map: dict, ctx: dict) -> dict:
     prompt = (f"{task}\n\nUI map: {json.dumps(ui_map)}\nContext: {json.dumps(ctx)}\n"
               'Return ONLY JSON: {"findings":[{"issue":...,"severity":"high|medium|low",'
@@ -174,7 +167,6 @@ def run_agentic_review(image_path: str, palette: list) -> dict:
     a11y = accessibility_check(palette)
     ctx = {"accessibility": a11y, "palette": [list(c) for c in palette]}
 
-    # agents run concurrently — Groq's low latency makes the fan-out cheap
     outputs = {}
     with cf.ThreadPoolExecutor(max_workers=len(AGENTS)) as ex:
         futs = {ex.submit(fn, ui_map, ctx): name for name, fn in AGENTS.items()}
@@ -186,9 +178,8 @@ def run_agentic_review(image_path: str, palette: list) -> dict:
             "agents": outputs, "executive_report": report}
 
 
-# ===========================================================================
-# RAG-GROUNDED DESIGN MENTOR  (Features 3 & 4)
-# ===========================================================================
+# RAG-GROUNDED DESIGN MENTOR 
+
 KNOWLEDGE_SOURCES = [
     "nielsen_heuristics.md", "wcag_2_1.md", "material_design.md",
     "apple_hig.md", "ux_research_papers/", "design_thinking.md",
@@ -221,9 +212,8 @@ def ask_mentor(question: str, store=None, history: list = None) -> str:
     return chat(prompt, model=MODELS["reason"], json_mode=False, temperature=0.5, system=system)
 
 
-# ===========================================================================
-# DESIGN -> REQUIREMENTS / PRD  (Features 2 & 8)
-# ===========================================================================
+# DESIGN -> REQUIREMENTS / PRD  
+
 def design_to_requirements(ui_map: dict) -> dict:
     prompt = ("From this detected UI, produce a product spec. Return ONLY JSON: "
               '{"components":[...],"functional_requirements":[...],'
@@ -233,9 +223,8 @@ def design_to_requirements(ui_map: dict) -> dict:
     return chat(prompt, model=MODELS["reason"], temperature=0.4)
 
 
-# ===========================================================================
-# PORTFOLIO REVIEW + RECRUITER SIMULATION  (Features 9 & 10)
-# ===========================================================================
+# PORTFOLIO REVIEW + RECRUITER SIMULATION  
+
 def portfolio_review(case_study_text: str) -> dict:
     prompt = ("Evaluate this design portfolio / case study for quality, storytelling, "
               "visual consistency, UX process, accessibility and recruiter appeal. "
