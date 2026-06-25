@@ -1,4 +1,5 @@
 Designed and built an AI-powered platform that analyzes any interface screenshot, wireframe, or mockup and returns UX scores, accessibility audits, design critiques, and actionable improvement recommendations automating a review process that normally takes designers hours.
+
 Key contributions:
 
 Architected an agentic AI system of five specialized agents (UX research, accessibility, visual design, product strategy, and design systems) coordinated by an orchestrator agent that fuses their findings into a single executive report.
